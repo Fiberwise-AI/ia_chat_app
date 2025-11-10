@@ -1,0 +1,148 @@
+{
+    "name": "Simple Chat Pipeline",
+    "description": "LLM chat with history and conditional title generation for first message",
+    "version": "3.0.0",
+    "parameters": [
+        {
+            "name": "message",
+            "schema": {"type": "string"},
+            "required": true,
+            "description": "User message"
+        },
+        {
+            "name": "session_id",
+            "schema": {"type": "string"},
+            "required": false,
+            "description": "Chat session ID (null for new chat)"
+        }
+    ],
+    "steps": [
+        {
+            "id": "fetch_history",
+            "name": "Fetch Chat History",
+            "step_class": "FetchChatHistoryStep",
+            "module": "app.pipeline_steps.fetch_chat_history_step",
+            "config": {},
+            "inputs": [
+                {
+                    "name": "session_id",
+                    "source": "{parameters.session_id}",
+                    "schema": {"type": "string"},
+                    "required": false
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "chat_history",
+                    "schema": {"type": "array"},
+                    "required": true,
+                    "description": "Array of {role, content} message objects"
+                },
+                {
+                    "name": "message_count",
+                    "schema": {"type": "integer"},
+                    "required": true,
+                    "description": "Total number of messages in this session"
+                },
+                {
+                    "name": "is_first_message",
+                    "schema": {"type": "boolean"},
+                    "required": true,
+                    "description": "Whether this is the first message (message_count == 0)"
+                }
+            ]
+        },
+        {
+            "id": "chat",
+            "name": "LLM Chat",
+            "step_class": "SimpleChatStep",
+            "module": "app.pipeline_steps.simple_chat_step",
+            "config": {
+                "temperature": 0.7,
+                "max_tokens": 500
+            },
+            "inputs": [
+                {
+                    "name": "message",
+                    "source": "{parameters.message}",
+                    "schema": {"type": "string"},
+                    "required": true
+                },
+                {
+                    "name": "chat_history",
+                    "source": "{steps.fetch_history.output.chat_history}",
+                    "schema": {"type": "array"},
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "response",
+                    "schema": {"type": "string"},
+                    "required": true,
+                    "description": "LLM-generated response"
+                },
+                {
+                    "name": "metadata",
+                    "schema": {"type": "object"},
+                    "required": true,
+                    "description": "Response metadata (provider, model, tokens, cost)"
+                }
+            ]
+        },
+        {
+            "id": "generate_title",
+            "name": "Generate Chat Title",
+            "step_class": "TitleGenerationStep",
+            "module": "app.pipeline_steps.title_generation_step",
+            "config": {
+                "temperature": 0.3,
+                "max_tokens": 20
+            },
+            "inputs": [
+                {
+                    "name": "message",
+                    "source": "{parameters.message}",
+                    "schema": {"type": "string"},
+                    "required": true
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "title",
+                    "schema": {"type": "string"},
+                    "required": true,
+                    "description": "LLM-generated chat title (3-6 words)"
+                },
+                {
+                    "name": "title_metadata",
+                    "schema": {"type": "object"},
+                    "required": true,
+                    "description": "Title generation metadata"
+                }
+            ]
+        }
+    ],
+    "flow": {
+        "start_at": "fetch_history",
+        "paths": [
+            {
+                "from": "fetch_history",
+                "to": "chat",
+                "condition": {"type": "always"}
+            },
+            {
+                "from": "fetch_history",
+                "to": "generate_title",
+                "condition": {
+                    "type": "expression",
+                    "config": {
+                        "source": "fetch_history.is_first_message",
+                        "operator": "equals",
+                        "value": true
+                    }
+                }
+            }
+        ]
+    }
+}
