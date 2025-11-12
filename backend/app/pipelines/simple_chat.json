@@ -14,6 +14,12 @@
             "schema": {"type": "string"},
             "required": false,
             "description": "Chat session ID (null for new chat)"
+        },
+        {
+            "name": "system_prompt",
+            "schema": {"type": "string"},
+            "required": false,
+            "description": "System prompt to guide the assistant's behavior"
         }
     ],
     "steps": [
@@ -53,6 +59,47 @@
             ]
         },
         {
+            "id": "fetch_documents",
+            "name": "Fetch Documents",
+            "step_class": "FetchDocumentsStep",
+            "module": "app.pipeline_steps.fetch_documents_step",
+            "config": {},
+            "inputs": [
+                {
+                    "name": "session_id",
+                    "source": "{parameters.session_id}",
+                    "schema": {"type": "string"},
+                    "required": false
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "documents",
+                    "schema": {"type": "array"},
+                    "required": true,
+                    "description": "List of document metadata"
+                },
+                {
+                    "name": "document_context",
+                    "schema": {"type": "string"},
+                    "required": true,
+                    "description": "Formatted document content for LLM context with chunk IDs"
+                },
+                {
+                    "name": "document_count",
+                    "schema": {"type": "integer"},
+                    "required": true,
+                    "description": "Number of documents attached"
+                },
+                {
+                    "name": "chunk_mapping",
+                    "schema": {"type": "array"},
+                    "required": true,
+                    "description": "Mapping of chunk IDs to document metadata for citations"
+                }
+            ]
+        },
+        {
             "id": "chat",
             "name": "LLM Chat",
             "step_class": "SimpleChatStep",
@@ -73,6 +120,30 @@
                     "source": "{steps.fetch_history.output.chat_history}",
                     "schema": {"type": "array"},
                     "required": true
+                },
+                {
+                    "name": "system_prompt",
+                    "source": "{parameters.system_prompt}",
+                    "schema": {"type": "string"},
+                    "required": false
+                },
+                {
+                    "name": "document_context",
+                    "source": "{steps.fetch_documents.output.document_context}",
+                    "schema": {"type": "string"},
+                    "required": false
+                },
+                {
+                    "name": "document_count",
+                    "source": "{steps.fetch_documents.output.document_count}",
+                    "schema": {"type": "integer"},
+                    "required": false
+                },
+                {
+                    "name": "chunk_mapping",
+                    "source": "{steps.fetch_documents.output.chunk_mapping}",
+                    "schema": {"type": "array"},
+                    "required": false
                 }
             ],
             "outputs": [
@@ -128,11 +199,16 @@
         "paths": [
             {
                 "from": "fetch_history",
+                "to": "fetch_documents",
+                "condition": {"type": "always"}
+            },
+            {
+                "from": "fetch_documents",
                 "to": "chat",
                 "condition": {"type": "always"}
             },
             {
-                "from": "fetch_history",
+                "from": "fetch_documents",
                 "to": "generate_title",
                 "condition": {
                     "type": "expression",

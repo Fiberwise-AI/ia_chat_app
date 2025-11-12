@@ -1,0 +1,158 @@
+/* Citation content wrapper */
+.citation-content {
+  position: relative;
+}
+
+/* Citation markers (superscript numbers) */
+.citation {
+  position: relative;
+  cursor: help;
+  color: #0066cc;
+  font-weight: 600;
+  margin: 0 2px;
+  transition: all 0.2s ease;
+}
+
+.citation:hover {
+  color: #0052a3;
+}
+
+.citation-marker {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+/* Citation tooltip on hover */
+.citation-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 250px;
+  max-width: 400px;
+  white-space: normal;
+  pointer-events: none;
+}
+
+.citation-doc-name {
+  margin-bottom: 6px;
+  color: #1a1a1a;
+  font-size: 14px;
+}
+
+.citation-url {
+  margin-bottom: 6px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.citation-url a {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.citation-url a:hover {
+  text-decoration: underline;
+}
+
+.citation-meta {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Sources list at bottom */
+.citations-list {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.citations-header {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.citation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.citation-num {
+  color: #0066cc;
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.citation-name {
+  flex: 1;
+  color: #1a1a1a;
+}
+
+.citation-link {
+  font-size: 16px;
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.citation-link:hover {
+  opacity: 1;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .citation {
+    color: #66b3ff;
+  }
+
+  .citation:hover {
+    color: #4da3ff;
+  }
+
+  .citation-tooltip {
+    background: #2a2a2a;
+    border-color: #404040;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .citation-doc-name {
+    color: #e0e0e0;
+  }
+
+  .citation-url a {
+    color: #66b3ff;
+  }
+
+  .citation-meta {
+    color: #999;
+  }
+
+  .citations-list {
+    border-top-color: #404040;
+  }
+
+  .citations-header {
+    color: #e0e0e0;
+  }
+
+  .citation-num {
+    color: #66b3ff;
+  }
+
+  .citation-name {
+    color: #e0e0e0;
+  }
+}

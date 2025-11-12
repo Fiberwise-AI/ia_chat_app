@@ -1,7 +1,45 @@
 # IA Chat App - Development Roadmap
 
 **Created**: 2025-11-06
+**Last Updated**: 2025-11-10
 **Status**: Active Development
+
+---
+
+## 📈 Progress Summary (Nov 10, 2025)
+
+**Completed Today**: 20 major features - DOCUMENT MANAGEMENT SYSTEM COMPLETE! 🎉🎉
+
+- ✅ **Phase 1 (Testing)**: Manual tests + branching tree unit tests
+- ✅ **Phase 2 (UX) - COMPLETE**: All 4 sub-phases done!
+  - Markdown rendering with syntax highlighting
+  - Code copy buttons with language badges
+  - Typing indicators (verified working)
+  - Chat bubbles with avatars, timestamps, scroll button
+- ✅ **Phase 3 (Quick Wins)**: System prompts + history limits + cost tracking
+- ✅ **Phase 6.2 (Document Processing) - COMPLETE**: File upload & URL scraping!
+- ✅ **Phase 6.2.1 (RAG Citations) - COMPLETE**: Source attribution & citations!
+- ✅ **Phase 6.2.2 (Selective Inclusion) - COMPLETE**: Control which documents are used!
+- ✅ **Phase 6.2.3 (Document Library) - COMPLETE**: Global library with search & organization!
+- ✅ **Phase 6.2.4 (Collections & Tags) - COMPLETE**: Organize with collections, tags, folders!
+
+**Key Improvements**:
+- 🎨 Full markdown support with GitHub Dark theme
+- 📋 One-click code copying with language detection
+- 💰 Real-time cost and token tracking
+- 🎛️ Collapsible system prompt editor
+- ⚡ Smart 20-message context window
+- 👤 Modern chat bubbles with emoji avatars
+- ⏰ Relative timestamps ("5m ago", "2h ago")
+- 🔽 Floating scroll-to-bottom button
+- 📎 **File upload** (PDF, TXT, MD, DOCX)
+- 🌐 **URL scraping** for web content
+- 📄 **Document context** in LLM conversations
+- 🔗 **RAG Citations**: Inline citations with hover tooltips and source attribution
+- ☑️ **Selective Inclusion**: Checkbox controls for which documents AI uses
+- 📚 **Document Library**: Global library across all chats with search
+- 🗂️ **Collections**: Group related documents with colors
+- 🏷️ **Tags & Folders**: Full organization system for power users
 
 ---
 
@@ -17,6 +55,27 @@
 - [x] **CRITICAL**: Fixed parallel execution bug in ia_modules
 - [x] Comprehensive parallel execution documentation
 
+### Recent Completions (Nov 10, 2025)
+- [x] **Phase 1.1**: Manual title generation testing
+- [x] **Phase 1.2**: Branching tree pattern unit tests (4 tests passing)
+- [x] **Phase 2 (COMPLETE)**: All UX improvements
+  - [x] **Phase 2.1**: Full markdown rendering with syntax highlighting
+  - [x] **Phase 2.2**: Code block copy buttons with language detection
+  - [x] **Phase 2.3**: Typing indicators (verified existing implementation)
+  - [x] **Phase 2.4**: Chat bubbles, avatars, smart timestamps, scroll button
+- [x] **Phase 3.1**: System prompt customization UI
+- [x] **Phase 3.2**: Chat history limited to 20 messages
+- [x] **Phase 3.3**: Cost tracking and session statistics
+- [x] **Phase 6.2 (COMPLETE)**: Document Processing - File Upload & URL Scraping
+  - [x] Database schema for documents table
+  - [x] File upload endpoint (PDF, TXT, MD, DOCX - max 10MB)
+  - [x] URL scraping endpoint with BeautifulSoup
+  - [x] FetchDocumentsStep pipeline integration
+  - [x] Document context in SimpleChatStep
+  - [x] DocumentUpload React component
+  - [x] DocumentList React component with preview
+  - [x] Backend dependencies installed (pypdf, python-docx, beautifulsoup4, httpx)
+
 ---
 
 ## 🎯 Active Development
@@ -24,27 +83,28 @@
 ### Phase 1: Quality & Testing (Priority: HIGH)
 **Goal**: Ensure reliability and prevent regressions
 
-#### 1.1 Test the Title Generation End-to-End ⏳
-- [ ] Manual test: Create new chat
-- [ ] Verify title appears in sidebar
-- [ ] Verify title doesn't regenerate on second message
-- [ ] Check database has correct title
-- [ ] Test with various message types
+#### 1.1 Test the Title Generation End-to-End ✅
+- [x] Manual test: Create new chat
+- [x] Verify title appears in sidebar
+- [x] Verify title doesn't regenerate on second message
+- [x] Check database has correct title
+- [x] Test with various message types
 
-**Estimated Time**: 15 minutes
-**Assigned To**: Manual testing
-**Blockers**: None
+**Completed**: 2025-11-10
+**Status**: ✅ All manual tests passed
 
-#### 1.2 Write Branching Tree Pattern Tests ⏳
-- [ ] Create `ia_modules/tests/unit/test_branching_tree_pattern.py`
-- [ ] Test terminal branches both execute
-- [ ] Test conditional branching with expression
-- [ ] Test exact step count assertions
-- [ ] Run full test suite
+#### 1.2 Write Branching Tree Pattern Tests ✅
+- [x] Create `ia_modules/tests/unit/test_branching_tree_pattern.py`
+- [x] Test terminal branches both execute
+- [x] Test conditional branching with expression
+- [x] Test exact step count assertions
+- [x] Run full test suite
 
-**Estimated Time**: 30 minutes
-**Reference**: `docs/PARALLEL_EXECUTION_TEST_PLAN.md`
-**Blockers**: None
+**Completed**: 2025-11-10
+**Status**: ✅ All 4 tests PASSED in 0.63s
+**Files Created**:
+- `ia_modules/tests/unit/test_branching_tree_pattern.py`
+- `ia_modules/tests/pipelines/branching_tree_pipeline/steps/test_steps.py`
 
 #### 1.3 Add Chat App Integration Tests
 - [ ] Create `ia_chat_app/tests/test_title_generation.py`
@@ -61,77 +121,84 @@
 ### Phase 2: UX Improvements (Priority: HIGH)
 **Goal**: Make the app actually enjoyable to use
 
-#### 2.1 Markdown Rendering
-- [ ] Install `marked` or `react-markdown`
-- [ ] Render assistant messages as markdown
-- [ ] Add code syntax highlighting (`highlight.js` or `prism`)
-- [ ] Style markdown elements (headings, lists, blockquotes)
-- [ ] Test with various markdown samples
+#### 2.1 Markdown Rendering ✅
+- [x] Install `react-markdown` with plugins
+- [x] Render assistant messages as markdown
+- [x] Add code syntax highlighting with `rehype-highlight`
+- [x] Style markdown elements (headings, lists, blockquotes, tables)
+- [x] Comprehensive CSS styling for all markdown elements
 
-**Estimated Time**: 1-2 hours
-**Dependencies**: npm packages
+**Completed**: 2025-11-10
+**Status**: ✅ Full markdown support with GitHub Dark syntax theme
 
-#### 2.2 Code Block Features
-- [ ] Copy-to-clipboard button for code blocks
-- [ ] Language detection and display
-- [ ] Line numbers (optional)
-- [ ] Syntax theme selection
+#### 2.2 Code Block Features ✅
+- [x] Copy-to-clipboard button for code blocks
+- [x] Language detection and display
+- [x] Custom CodeBlock component with header
+- [x] Visual feedback on copy (checkmark animation)
 
-**Estimated Time**: 1 hour
-**Blockers**: Needs 2.1 complete
+**Completed**: 2025-11-10
+**Status**: ✅ Code blocks have copy button with language badge
 
-#### 2.3 Enhanced Chat UI
-- [ ] Typing indicator during generation
-- [ ] Regenerate response button
-- [ ] Edit message and regenerate
-- [ ] Delete message
-- [ ] Message actions menu (copy, delete, regenerate)
+#### 2.3 Enhanced Chat UI ✅
+- [x] Typing indicator during generation (already implemented)
+- [ ] Regenerate response button (deferred)
+- [ ] Edit message and regenerate (deferred)
+- [ ] Delete message (deferred)
+- [ ] Message actions menu (deferred - future enhancement)
 
-**Estimated Time**: 2-3 hours
-**Blockers**: None
+**Completed**: 2025-11-10
+**Status**: ✅ Typing indicator verified working
+**Note**: Advanced features (regenerate, edit, delete) deferred to future phase
 
-#### 2.4 Better Message Display
-- [ ] User avatars/icons
-- [ ] Timestamp formatting
-- [ ] Message status indicators (sending, sent, error)
-- [ ] Streaming response display (character-by-character)
-- [ ] Scroll to bottom button when not at bottom
+#### 2.4 Better Message Display ✅
+- [x] User avatars/icons (emoji avatars)
+- [x] Timestamp formatting (relative time: "5m ago", "2h ago")
+- [x] Message status indicators (loading state with typing animation)
+- [x] Scroll to bottom button when not at bottom
+- [ ] Streaming response display (deferred - requires backend changes)
 
-**Estimated Time**: 2 hours
-**Blockers**: None
+**Completed**: 2025-11-10
+**Status**: ✅ Modern chat bubble design with avatars and smart timestamps
+**Files Modified**:
+- `App.jsx` - Added formatTimestamp helper, avatars, scroll tracking
+- `App.css` - New message bubble layout with flex, avatars, scroll button
 
 ---
 
 ### Phase 3: Quick Wins (Priority: MEDIUM)
 **Goal**: Small improvements with immediate impact
 
-#### 3.1 System Prompts
-- [ ] Add system message to chat pipeline
-- [ ] Create UI to customize system prompt
-- [ ] Save system prompt per session
-- [ ] Provide templates (coding assistant, creative writer, etc.)
+#### 3.1 System Prompts ✅
+- [x] Add system message parameter to chat pipeline
+- [x] Update SimpleChatStep to use system prompt
+- [x] Create UI with collapsible system prompt editor
+- [x] System prompt persists during session
 
-**Estimated Time**: 30 minutes
-**Files**: `simple_chat_step.py`, frontend settings UI
+**Completed**: 2025-11-10
+**Status**: ✅ Users can customize system prompts per message
+**Files Modified**:
+- `simple_chat_step.py` - accepts system_prompt parameter
+- `simple_chat.json` - added system_prompt parameter
+- `App.jsx` - collapsible system prompt UI
 
-#### 3.2 Chat History Limits
-- [ ] Limit to last 20 messages to prevent token overflow
-- [ ] Add pagination for viewing old messages
-- [ ] Show "X more messages" indicator
-- [ ] Option to include full history (advanced)
+#### 3.2 Chat History Limits ✅
+- [x] Limit to last 20 messages to prevent token overflow
+- [x] Modified SQL query with DESC + LIMIT + reverse
 
-**Estimated Time**: 30 minutes
-**Files**: `fetch_chat_history_step.py`
+**Completed**: 2025-11-10
+**Status**: ✅ Chat history limited to 20 messages
+**Files Modified**: `fetch_chat_history_step.py`
 
-#### 3.3 Cost Tracking
-- [ ] Display estimated cost per message
-- [ ] Session total cost
-- [ ] User total cost (all sessions)
-- [ ] Cost breakdown by model
-- [ ] Budget alerts
+#### 3.3 Cost Tracking ✅
+- [x] Display cost per message in metadata
+- [x] Session total cost summary
+- [x] Total tokens counter
+- [x] Message count display
 
-**Estimated Time**: 1 hour
-**Files**: Frontend components, new DB table
+**Completed**: 2025-11-10
+**Status**: ✅ Session stats bar shows cost, tokens, and message count
+**Files Modified**: `App.jsx`, `App.css`
 
 #### 3.4 Export Chat
 - [ ] Export session as markdown
@@ -241,14 +308,110 @@
 **Estimated Time**: 3-4 hours
 **Blockers**: app_knowledge_base needs cleanup
 
-#### 6.2 Document Upload
-- [ ] Upload PDFs, markdown, text
-- [ ] Extract and index content
-- [ ] Search across uploaded docs
-- [ ] Reference in chat
+#### 6.2 Document Upload & URL Scraping ✅
+- [x] Upload PDFs, markdown, text, DOCX (max 10MB)
+- [x] Extract text content (pypdf, python-docx)
+- [x] URL scraping with BeautifulSoup
+- [x] Document context automatically included in chat
+- [x] Delete documents from session
+- [x] Document preview and metadata display
 
-**Estimated Time**: 4-5 hours
-**Blockers**: File upload UI, storage
+**Completed**: 2025-11-10
+**Status**: ✅ COMPLETE - File upload, URL scraping, and document context fully functional
+**Files Created**:
+- `backend/app/api/document_routes.py` - Upload, scrape, list, delete endpoints
+- `backend/app/pipeline_steps/fetch_documents_step.py` - Pipeline integration
+- `backend/app/database/migrations/V003__documents.sql` - Database schema
+- `frontend/src/components/DocumentUpload.jsx` - File upload & URL input UI
+- `frontend/src/components/DocumentList.jsx` - Document list with preview & delete
+- Updated `simple_chat.json` pipeline to include fetch_documents step
+- Updated `SimpleChatStep` to use document context
+
+#### 6.2.1 RAG-Style Citations ✅
+- [x] Document chunking (500 words, 50-word overlap)
+- [x] Chunk ID generation ([doc1_chunk0], [doc2_chunk1])
+- [x] Enhanced LLM citation instructions in system prompt
+- [x] Chunk mapping passed through pipeline
+- [x] CitationHighlighter React component with tooltip rendering
+- [x] Numbered citation conversion ([1], [2], etc.)
+- [x] Hover tooltips showing document name, URL, type
+- [x] Sources list at bottom of responses with clickable links
+- [x] Document count display in message metadata
+- [x] Dark mode support for citations
+
+**Completed**: 2025-11-10
+**Status**: ✅ COMPLETE - RAG-style citations with source attribution
+**Files Created**:
+- `frontend/src/components/CitationHighlighter.jsx` - Citation parsing and rendering
+- `frontend/src/components/CitationHighlighter.css` - Citation styling with tooltips
+**Files Modified**:
+- `backend/app/pipeline_steps/fetch_documents_step.py` - Added chunking logic
+- `backend/app/pipeline_steps/simple_chat_step.py` - Enhanced citation instructions
+- `backend/app/pipelines/simple_chat.json` - Added chunk_mapping to pipeline
+- `frontend/src/App.jsx` - Integrated CitationHighlighter component
+
+#### 6.2.2 Selective Document Inclusion ✅
+- [x] Checkbox UI for toggling document inclusion
+- [x] Backend filtering by `included_in_context` flag
+- [x] Visual indicators for excluded documents
+- [x] Real-time toggle with instant feedback
+- [x] Database schema with default TRUE for backward compatibility
+
+**Completed**: 2025-11-10
+**Status**: ✅ COMPLETE - Users can control which documents AI uses per message
+**Files Created**:
+- `backend/app/database/migrations/V004__document_inclusion.sql` - Schema for organization features
+**Files Modified**:
+- `backend/app/api/document_routes.py` - Added toggle-inclusion endpoint
+- `backend/app/pipeline_steps/fetch_documents_step.py` - Filter by included_in_context
+- `frontend/src/components/DocumentList.jsx` - Added checkboxes and toggles
+- `frontend/src/components/DocumentList.css` - Styled excluded state
+- `frontend/src/App.jsx` - Added update callback
+
+#### 6.2.3 Global Document Library ✅
+- [x] Sidebar toggle between chats and document library
+- [x] View all documents across all sessions
+- [x] Search documents by name and content
+- [x] Filter by collections
+- [x] Document preview cards with metadata
+- [x] Session attribution (shows which chat document came from)
+- [x] Quick actions menu on each document
+
+**Completed**: 2025-11-10
+**Status**: ✅ COMPLETE - Full-featured document library with search and filtering
+**Files Created**:
+- `frontend/src/components/DocumentLibrary.jsx` - Main library component
+- `frontend/src/components/DocumentLibrary.css` - Library styling
+**Files Modified**:
+- `backend/app/api/document_routes.py` - Added `/library/all` endpoint with filters
+- `frontend/src/App.jsx` - Integrated library in sidebar with tabs
+- `frontend/src/App.css` - Added sidebar tab styling
+
+#### 6.2.4 Collections, Tags & Folders ✅
+- [x] Document collections with custom colors
+- [x] Create/delete collections
+- [x] Assign documents to collections
+- [x] Tag system with array storage
+- [x] Folder path hierarchy
+- [x] Collection cards with document counts
+- [x] Visual collection badges on documents
+- [x] Backend API for all organization features
+
+**Completed**: 2025-11-10
+**Status**: ✅ COMPLETE - Professional document organization system
+**Database Changes**:
+- `document_collections` table with colors and descriptions
+- `tags` array column on documents (PostgreSQL array type)
+- `collection_id` foreign key with cascade delete
+- `folder_path` text column for hierarchical organization
+- Indexes on tags (GIN), collection_id, folder_path
+**Backend Endpoints**:
+- POST `/api/documents/collections` - Create collection
+- GET `/api/documents/collections` - List with document counts
+- DELETE `/api/documents/collections/{id}` - Delete collection
+- PATCH `/api/documents/{id}/tags` - Update document tags
+- PATCH `/api/documents/{id}/collection` - Move to collection
+- PATCH `/api/documents/{id}/folder` - Move to folder
 
 #### 6.3 Research Notebooks
 - [ ] Connect to research notebook system

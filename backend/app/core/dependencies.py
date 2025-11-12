@@ -25,6 +25,7 @@ from ia_modules.pipeline.services import ServiceRegistry
 from nexusql import DatabaseManager
 from app.core.container import ServiceContainer
 from app.core.pipeline_cache import PipelineCache
+from ia_auth_sessions import get_current_active_user
 
 
 def get_services(request: Request) -> ServiceContainer:
@@ -50,3 +51,7 @@ def get_db_manager(request: Request) -> DatabaseManager:
 def get_pipeline_cache(request: Request) -> PipelineCache:
     """Get pipeline cache from app state."""
     return request.app.state.services.pipeline_cache
+
+
+# Authentication dependency (alias for consistency with document routes)
+get_current_user = get_current_active_user

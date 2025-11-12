@@ -1,0 +1,61 @@
+.code-block-wrapper {
+  position: relative;
+  margin: 0.5rem 0;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2d2d2d;
+  padding: 0.5rem 1rem;
+  border-radius: 4px 4px 0 0;
+  border-bottom: 1px solid #404040;
+}
+
+.code-language {
+  font-size: 0.8rem;
+  color: #a0a0a0;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.code-copy-btn {
+  padding: 0.25rem 0.75rem;
+  border: none;
+  background: #404040;
+  color: #e0e0e0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.code-copy-btn:hover {
+  background: #505050;
+}
+
+.code-copy-btn:active {
+  transform: scale(0.95);
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  border-radius: 0 0 4px 4px;
+}
+
+/* Fix ReactMarkdown inline code vs block code rendering */
+.message.assistant .message-content p code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+}
+
+.message.assistant .message-content pre code {
+  background: transparent;
+  padding: 0;
+}

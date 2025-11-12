@@ -301,6 +301,15 @@ async def websocket_chat(websocket: WebSocket):
     session_manager = websocket.app.state.session_manager
     db_manager = websocket.app.state.services.db_manager
 
+    # Get WebSocket manager and document processor
+    from app.services.websocket_manager import get_websocket_manager
+    from app.services.document_processor import DocumentProcessor
+    from app.utils.url_extractor import URLExtractor
+    import asyncio
+
+    ws_manager = get_websocket_manager()
+    doc_processor = DocumentProcessor(db_manager, ws_manager)
+
     # Validate session from cookie
     session_cookie = websocket.cookies.get("session")
     if not session_cookie:
@@ -346,6 +355,32 @@ async def websocket_chat(websocket: WebSocket):
                         "updated_at": now
                     }
                 )
+
+            # Register this WebSocket connection for the session
+            await ws_manager.connect(websocket, session_id)
+
+            # Extract URLs from message
+            detected_urls = URLExtractor.extract_urls(message)
+
+            # Process URLs in background if found
+            if detected_urls:
+                for url_info in detected_urls:
+                    if url_info['is_valid'] and not url_info['is_blocked']:
+                        # Broadcast URL detection
+                        await ws_manager.broadcast_url_detected(
+                            session_id=session_id,
+                            url=url_info['url'],
+                            domain=url_info['domain']
+                        )
+
+                        # Process URL in background (don't await)
+                        asyncio.create_task(
+                            doc_processor.process_url(
+                                url=url_info['url'],
+                                session_id=session_id,
+                                user_id=user['id']
+                            )
+                        )
 
             # Save user message
             await save_message(db_manager, session_id, "user", message, None)
@@ -394,3 +429,6 @@ async def websocket_chat(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info(f"Client disconnected: {user['username']}")
+        # Disconnect from WebSocket manager if session_id was set
+        if 'session_id' in locals():
+            await ws_manager.disconnect(websocket, session_id)

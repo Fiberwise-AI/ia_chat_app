@@ -4,19 +4,35 @@ A production-ready chat application with AI assistant capabilities, conversation
 
 ## Features
 
-### User Features
-- **Account Management** - Create accounts, login with session-based authentication
-- **AI Chat** - Converse with multiple AI models (OpenAI, Anthropic, Google)
-- **Conversation History** - Full chat history stored and retrieved for context-aware responses
-- **Auto-Generated Titles** - AI automatically creates descriptive titles for new conversations
-- **Session Management** - View all past conversations, switch between chats
+### 🎨 Modern Chat Experience
+- **Markdown Rendering** - Full markdown support with syntax highlighting (GitHub Dark theme)
+- **Code Copy Buttons** - One-click copying with language detection and visual feedback
+- **Smart Timestamps** - Relative time display ("Just now", "5m ago", "2h ago")
+- **Chat Avatars** - Emoji avatars for users (👤) and assistant (🤖)
+- **Scroll Management** - Auto-scroll with floating "scroll to bottom" button
+- **Typing Indicators** - Visual feedback during AI response generation
+
+### 🎛️ Advanced Controls
+- **System Prompts** - Customize AI behavior with collapsible system prompt editor
+- **Session Management** - Persistent conversation history with session switching
+- **Auto-Generated Titles** - AI creates descriptive titles (first message only)
 - **Pipeline Management** - View, import, and manage AI processing pipelines
 
-### Chat Features
-- **Context-Aware Responses** - AI sees full conversation history for better answers
-- **Real-time WebSocket Communication** - Instant message delivery
-- **Multiple Sessions** - Maintain separate conversation threads
-- **Session Persistence** - Conversations saved to database
+### 💰 Transparency & Tracking
+- **Cost Tracking** - Real-time display of LLM costs per message and session totals
+- **Token Counting** - Monitor token usage across conversations
+- **Metadata Display** - View provider, model, tokens, and cost for each response
+
+### ⚡ Performance & Reliability
+- **Smart Context** - Automatic 20-message history limit to prevent token overflow
+- **WebSocket Real-time** - Instant message delivery and updates
+- **Conditional Pipelines** - Branching tree pattern for efficient processing
+- **Database Migrations** - Automated schema management with NexusQL
+
+### 🔐 Authentication
+- **Google OAuth** - Secure authentication via Google Sign-In
+- **Session Management** - Cookie-based sessions with ia_auth_sessions
+- **User Profiles** - Dropdown menu with user info and logout
 
 ## How It Works
 
@@ -161,14 +177,35 @@ Pipelines are JSON configuration files that define multi-step AI workflows:
 
 ## Key Features Explained
 
-### Conversation History
-- All messages stored in PostgreSQL database
-- Retrieved on each request to provide context to AI
-- Enables multi-turn conversations with memory
+### Smart Conversation Management
+- **Smart Context Window**: Automatic 20-message history limit prevents token overflow
+- **Persistent Storage**: All messages stored in SQLite/PostgreSQL database
+- **Context-Aware AI**: Full conversation history provided to LLM for better responses
+- **Efficient Retrieval**: SQL query with DESC + LIMIT + reverse for optimal performance
 
-### Automatic Title Generation
-- Uses conditional pipeline execution
-- Only runs on first message of conversation
-- AI generates concise 3-6 word titles
-- Updates session title in database automatically
+### Conditional Title Generation
+- **Cost-Saving**: Only runs on first message using branching tree pattern
+- **Automatic**: AI generates concise 3-6 word descriptive titles
+- **No Duplication**: Condition prevents re-generation on subsequent messages
+- **Pipeline-Based**: Declarative JSON configuration, not hardcoded logic
+
+### System Prompt Customization
+- **Collapsible UI**: Toggle system prompt editor to save space
+- **Per-Message**: System prompt passed with each request
+- **Flexible**: Customize AI behavior without code changes
+- **Pipeline Integration**: Seamlessly integrated into chat pipeline
+
+### Modern UX Features
+- **Markdown Rendering**: Full GitHub-flavored markdown with tables, lists, quotes
+- **Syntax Highlighting**: Code blocks with GitHub Dark theme via rehype-highlight
+- **Code Copying**: One-click copy with language badges and visual feedback
+- **Smart Timestamps**: Relative time ("5m ago") with hover for full timestamp
+- **Chat Bubbles**: Modern design with emoji avatars and flex layout
+- **Scroll Button**: Floating button appears when scrolled up from bottom
+
+### Cost & Performance Tracking
+- **Per-Message Costs**: Display LLM API costs for each response
+- **Session Totals**: Aggregate cost and token counts for entire conversation
+- **Metadata Display**: Show provider, model, tokens, and cost
+- **Real-time Updates**: Session stats update as conversation progresses
 

@@ -19,6 +19,7 @@ from ia_auth_sessions import SessionMiddleware, SessionManager, UserManager, htm
 from app.api.routes import router as chat_router
 from app.api.pipeline_routes import router as pipeline_router
 from app.api.frontend_routes import router as frontend_router
+from app.api.document_routes import router as document_router
 from app.core.container import ServiceContainer
 from app.core.middleware import RequestLoggingMiddleware
 from app.core.pipeline_cache import PipelineCache
@@ -288,6 +289,7 @@ app.include_router(html_router)  # HTML pages (login, register)
 app.include_router(api_router)   # API endpoints (JSON)
 app.include_router(chat_router)
 app.include_router(pipeline_router)  # Pipeline management
+app.include_router(document_router)  # Document upload and scraping
 
 
 if __name__ == "__main__":

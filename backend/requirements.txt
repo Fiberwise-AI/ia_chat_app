@@ -7,5 +7,12 @@ email-validator>=2.0.0
 psycopg2-binary>=2.9.0
 jinja2>=3.1.0
 litellm>=1.50.0
+
+# Document processing dependencies
+pypdf>=4.0.0
+python-docx>=1.2.0
+beautifulsoup4>=4.12.2
+httpx>=0.25.2
+
 # ia-auth-sessions>=0.1.0 - installed via docker volume
 # ia-modules>=0.1.0 - installed via docker volume

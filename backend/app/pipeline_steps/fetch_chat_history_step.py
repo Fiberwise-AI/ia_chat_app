@@ -29,16 +29,20 @@ class FetchChatHistoryStep(Step):
                 'is_first_message': True
             }
 
-        # Fetch messages for this session
+        # Fetch last 20 messages for this session to prevent token overflow
         messages = db_manager.fetch_all(
             """
             SELECT role, content, created_at
             FROM chat_messages
             WHERE session_id = :session_id
-            ORDER BY created_at ASC
+            ORDER BY created_at DESC
+            LIMIT 20
             """,
             {"session_id": session_id}
         )
+
+        # Reverse to get chronological order (oldest to newest)
+        messages = list(reversed(messages))
 
         # Format messages for LLM context
         chat_history = [

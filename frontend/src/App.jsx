@@ -1,6 +1,34 @@
 import { useState, useEffect, useRef } from 'react'
-import './App.css'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+import 'highlight.js/styles/github-dark.css'
+import './App.modern.css'
 import { API_BASE_URL } from './config'
+import { CodeBlock, InlineCode } from './components/CodeBlock'
+import { DocumentUpload } from './components/DocumentUpload'
+import { DocumentList } from './components/DocumentList'
+import { CitationHighlighter } from './components/CitationHighlighter'
+import { DocumentLibrary } from './components/DocumentLibrary'
+import { SystemMessage } from './components/SystemMessage'
+import { PipelineProgress } from './components/PipelineProgress'
+import { AttachPopover } from './components/AttachPopover'
+
+// Helper function for better timestamp formatting
+const formatTimestamp = (timestamp) => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
 
 function App() {
   const [messages, setMessages] = useState([])
@@ -16,8 +44,17 @@ function App() {
   const [pipelines, setPipelines] = useState([])
   const [selectedPipeline, setSelectedPipeline] = useState(null)
   const [pipelineJson, setPipelineJson] = useState(null)
+  const [systemPrompt, setSystemPrompt] = useState('You are a helpful AI assistant.')
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [documents, setDocuments] = useState([])
+  const [sidebarView, setSidebarView] = useState('chats') // 'chats' or 'documents'
+  const [showAttachPopover, setShowAttachPopover] = useState(false)
+  const [pipelineEvents, setPipelineEvents] = useState([])
   const messagesEndRef = useRef(null)
   const dropdownRef = useRef(null)
+  const messagesContainerRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     // Check URL for session ID
@@ -70,10 +107,12 @@ function App() {
     const wsBaseUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')
     const wsUrl = `${wsBaseUrl}/api/ws/chat`
 
+    console.log('Creating WebSocket connection to:', wsUrl)
     const websocket = new WebSocket(wsUrl)
 
     websocket.onopen = () => {
-      console.log('WebSocket connected')
+      console.log('WebSocket connected successfully')
+      setWs(websocket)
     }
 
     websocket.onmessage = (event) => {
@@ -106,6 +145,70 @@ function App() {
           .then(res => res.json())
           .then(data => setSessions(data.sessions || []))
           .catch(err => console.error('Failed to refresh sessions:', err))
+      } else if (data.type === 'url_detected') {
+        // Add system message for URL detection
+        const systemMessage = {
+          role: 'system',
+          content: `🔗 Found URL: ${data.data.url}`,
+          type: 'url_detection',
+          metadata: { url: data.data.url, domain: data.data.domain },
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, systemMessage])
+      } else if (data.type === 'pipeline_progress') {
+        // Add or update pipeline progress (ephemeral - for real-time display)
+        setPipelineEvents(prev => [...prev, data.data])
+
+        // Also save completed steps as system messages so they persist
+        if (data.data.status === 'completed') {
+          const progressMessage = {
+            role: 'system',
+            content: data.data.message,
+            type: 'pipeline_step',
+            metadata: data.data.metadata,
+            timestamp: new Date().toISOString()
+          }
+          setMessages(prev => [...prev, progressMessage])
+        }
+      } else if (data.type === 'document_complete') {
+        // Add completion message and reload documents
+        const systemMessage = {
+          role: 'system',
+          content: `✓ ${data.data.message}`,
+          type: 'document_added',
+          metadata: data.data.metadata,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, systemMessage])
+        setPipelineEvents([])
+
+        // Reload documents - use session_id from the event if available
+        const sessionId = data.data.session_id || currentSessionId
+        if (sessionId) {
+          setTimeout(async () => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/api/documents/session/${sessionId}`, {
+                credentials: 'include'
+              })
+              const docsData = await response.json()
+              setDocuments(docsData.documents || [])
+              console.log('Documents reloaded:', docsData.documents?.length || 0)
+            } catch (err) {
+              console.error('Failed to reload documents:', err)
+            }
+          }, 500)
+        }
+      } else if (data.type === 'error') {
+        // Add error message
+        const errorMessage = {
+          role: 'system',
+          content: `❌ ${data.data.message}`,
+          type: 'error',
+          error: true,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, errorMessage])
+        setPipelineEvents([])
       }
     }
 
@@ -116,12 +219,14 @@ function App() {
 
     websocket.onclose = () => {
       console.log('WebSocket disconnected')
+      setWs(null)
     }
 
-    setWs(websocket)
-
     return () => {
-      websocket.close()
+      console.log('Cleaning up WebSocket connection')
+      if (websocket.readyState === WebSocket.OPEN || websocket.readyState === WebSocket.CONNECTING) {
+        websocket.close()
+      }
     }
   }, [])
 
@@ -147,8 +252,83 @@ function App() {
     }
   }, [showDropdown])
 
+  useEffect(() => {
+    // Load documents when session changes
+    if (currentSessionId) {
+      fetch(`${API_BASE_URL}/api/documents/session/${currentSessionId}`, {
+        credentials: 'include'
+      })
+        .then(res => res.json())
+        .then(data => setDocuments(data.documents || []))
+        .catch(err => console.error('Failed to load documents:', err))
+    } else {
+      setDocuments([])
+    }
+  }, [currentSessionId])
+
+  useEffect(() => {
+    // Track scroll position to show/hide scroll button
+    const handleScroll = () => {
+      if (!messagesContainerRef.current) return
+      const { scrollTop, scrollHeight, clientHeight} = messagesContainerRef.current
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      setShowScrollButton(!isNearBottom && messages.length > 0)
+    }
+
+    const container = messagesContainerRef.current
+    if (container) {
+      container.addEventListener('scroll', handleScroll)
+      handleScroll() // Check initial state
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll)
+      }
+    }
+  }, [messages])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   const sendMessage = async () => {
-    if (!input.trim() || loading || !ws || ws.readyState !== WebSocket.OPEN) return
+    console.log('sendMessage called', {
+      input: input,
+      inputTrimmed: input.trim(),
+      loading: loading,
+      ws: ws,
+      wsReadyState: ws?.readyState,
+      wsOpen: WebSocket.OPEN
+    })
+
+    if (!input.trim()) {
+      console.log('Message is empty, not sending')
+      return
+    }
+
+    if (loading) {
+      console.log('Already loading, not sending')
+      return
+    }
+
+    if (!ws) {
+      console.error('WebSocket is not initialized')
+      return
+    }
+
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open. State:', ws.readyState)
+      const errorMsg = {
+        role: 'system',
+        content: '❌ Not connected to server. Please refresh the page.',
+        type: 'error',
+        error: true,
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, errorMsg])
+      return
+    }
 
     const userMessage = {
       role: 'user',
@@ -156,16 +336,21 @@ function App() {
       timestamp: new Date().toISOString()
     }
 
+    console.log('Sending message:', userMessage)
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setLoading(true)
 
     try {
       // Send message via WebSocket
-      ws.send(JSON.stringify({
+      const payload = {
         message: input,
-        session_id: currentSessionId
-      }))
+        session_id: currentSessionId,
+        system_prompt: systemPrompt
+      }
+      console.log('WebSocket payload:', payload)
+      ws.send(JSON.stringify(payload))
+      console.log('Message sent successfully')
     } catch (error) {
       console.error('Error sending message:', error)
       const errorMessage = {
@@ -199,6 +384,160 @@ function App() {
       window.location.href = `${API_BASE_URL}/auth/login`
     } catch (error) {
       console.error('Logout failed:', error)
+    }
+  }
+
+  const handleDocumentAdded = (document) => {
+    setDocuments(prev => [...prev, document])
+  }
+
+  const handleDocumentRemoved = (docId) => {
+    setDocuments(prev => prev.filter(d => d.id !== docId))
+  }
+
+  const loadDocuments = async () => {
+    if (!currentSessionId) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/session/${currentSessionId}`, {
+        credentials: 'include'
+      })
+      const data = await response.json()
+      setDocuments(data.documents || [])
+    } catch (err) {
+      console.error('Failed to load documents:', err)
+    }
+  }
+
+  const handleDocumentUpdated = () => {
+    loadDocuments()
+  }
+
+  // Attach popover handlers
+  const handleAttachClick = () => {
+    setShowAttachPopover(!showAttachPopover)
+  }
+
+  const handleFileSelectFromPopover = () => {
+    setShowAttachPopover(false)
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    // Create a user message showing the upload
+    const uploadMessage = {
+      role: 'user',
+      content: `[Uploaded: ${file.name}]`,
+      type: 'file_upload',
+      timestamp: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, uploadMessage])
+
+    // Upload the file
+    const formData = new FormData()
+    formData.append('file', file)
+    if (currentSessionId) {
+      formData.append('session_id', currentSessionId)
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update session if created
+        if (data.session_id && !currentSessionId) {
+          setCurrentSessionId(data.session_id)
+          window.history.pushState({}, '', `?session=${data.session_id}`)
+        }
+        // Document processing will be handled via WebSocket events
+        handleDocumentAdded(data.document)
+      } else {
+        const error = await response.json()
+        const errorMsg = {
+          role: 'system',
+          content: `❌ Upload failed: ${error.detail || 'Unknown error'}`,
+          type: 'error',
+          error: true,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, errorMsg])
+      }
+    } catch (err) {
+      console.error('Upload failed:', err)
+      const errorMsg = {
+        role: 'system',
+        content: `❌ Upload failed: ${err.message}`,
+        type: 'error',
+        error: true,
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, errorMsg])
+    }
+  }
+
+  const handleUrlSubmit = async (url) => {
+    setShowAttachPopover(false)
+
+    // Create a user message showing the URL
+    const urlMessage = {
+      role: 'user',
+      content: `[Added URL: ${url}]`,
+      type: 'url_add',
+      timestamp: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, urlMessage])
+
+    // Send URL to backend
+    const formData = new FormData()
+    formData.append('url', url)
+    if (currentSessionId) {
+      formData.append('session_id', currentSessionId)
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/scrape-url`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update session if created
+        if (data.session_id && !currentSessionId) {
+          setCurrentSessionId(data.session_id)
+          window.history.pushState({}, '', `?session=${data.session_id}`)
+        }
+        // URL processing will be handled via WebSocket events
+        handleDocumentAdded(data.document)
+      } else {
+        const error = await response.json()
+        const errorMsg = {
+          role: 'system',
+          content: `❌ URL scrape failed: ${error.detail || 'Unknown error'}`,
+          type: 'error',
+          error: true,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, errorMsg])
+      }
+    } catch (err) {
+      console.error('URL scrape failed:', err)
+      const errorMsg = {
+        role: 'system',
+        content: `❌ URL scrape failed: ${err.message}`,
+        type: 'error',
+        error: true,
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, errorMsg])
     }
   }
 
@@ -361,29 +700,60 @@ function App() {
       <div className="main-content">
         {view === 'chat' && showSidebar && (
           <aside className="sidebar">
-            <button className="new-chat-btn" onClick={newChat}>
-              + New Chat
-            </button>
-            <div className="sessions-list">
-              {sessions.map(session => (
-                <div
-                  key={session.id}
-                  className={`session-item ${currentSessionId === session.id ? 'active' : ''}`}
-                  onClick={() => loadSession(session.id)}
-                >
-                  <div className="session-title">{session.title}</div>
-                  <div className="session-date">
-                    {new Date(session.updated_at).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
+            <div className="sidebar-tabs">
+              <button
+                className={`sidebar-tab ${sidebarView === 'chats' ? 'active' : ''}`}
+                onClick={() => setSidebarView('chats')}
+              >
+                💬 Chats
+              </button>
+              <button
+                className={`sidebar-tab ${sidebarView === 'documents' ? 'active' : ''}`}
+                onClick={() => setSidebarView('documents')}
+              >
+                📚 Library
+              </button>
             </div>
+
+            {sidebarView === 'chats' ? (
+              <>
+                <button className="new-chat-btn" onClick={newChat}>
+                  + New Chat
+                </button>
+                <div className="sessions-list">
+                  {sessions.map(session => (
+                    <div
+                      key={session.id}
+                      className={`session-item ${currentSessionId === session.id ? 'active' : ''}`}
+                      onClick={() => loadSession(session.id)}
+                    >
+                      <div className="session-title">{session.title}</div>
+                      <div className="session-date">
+                        {new Date(session.updated_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="sidebar-library">
+                <DocumentLibrary
+                  apiBaseUrl={API_BASE_URL}
+                  currentSessionId={currentSessionId}
+                />
+              </div>
+            )}
           </aside>
         )}
 
         {view === 'chat' && (
           <div className="chat-container">
-        <div className="messages">
+        <div className="messages" ref={messagesContainerRef}>
+          {showScrollButton && (
+            <button className="scroll-to-bottom" onClick={scrollToBottom}>
+              ↓
+            </button>
+          )}
           {messages.length === 0 && (
             <div className="welcome">
               <h2>Welcome to IA Chat App</h2>
@@ -391,16 +761,73 @@ function App() {
             </div>
           )}
 
+          {messages.length > 0 && (
+            <div className="session-stats">
+              <span>Session Messages: {messages.length}</span>
+              <span>
+                Total Cost: ${messages
+                  .filter(m => m.metadata?.cost_usd)
+                  .reduce((sum, m) => sum + m.metadata.cost_usd, 0)
+                  .toFixed(4)}
+              </span>
+              <span>
+                Total Tokens: {messages
+                  .filter(m => m.metadata?.tokens)
+                  .reduce((sum, m) => sum + m.metadata.tokens, 0)
+                  .toLocaleString()}
+              </span>
+            </div>
+          )}
+
           {messages.map((msg, idx) => (
-            <div key={idx} className={`message ${msg.role} ${msg.error ? 'error' : ''}`}>
-              <div className="message-header">
-                <strong>{msg.role === 'user' ? 'You' : 'Assistant'}</strong>
-                <span className="timestamp">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
+            <div key={idx} className={`message ${msg.role} ${msg.type || ''} ${msg.error ? 'error' : ''}`}>
+              {msg.role !== 'system' && (
+                <div className="message-avatar">
+                  {msg.role === 'user' ? '👤' : '🤖'}
+                </div>
+              )}
+              <div className="message-bubble">
+                {msg.role !== 'system' && (
+                  <div className="message-header">
+                    <strong>{msg.role === 'user' ? 'You' : 'Assistant'}</strong>
+                    <span className="timestamp" title={new Date(msg.timestamp).toLocaleString()}>
+                      {formatTimestamp(msg.timestamp)}
+                    </span>
+                  </div>
+                )}
               <div className="message-content">
-                <pre>{msg.content}</pre>
+                {msg.role === 'system' ? (
+                  <SystemMessage message={msg} />
+                ) : msg.role === 'assistant' ? (
+                  msg.metadata?.chunk_mapping && msg.metadata.chunk_mapping.length > 0 ? (
+                    <CitationHighlighter
+                      content={msg.content}
+                      chunkMapping={msg.metadata.chunk_mapping}
+                    />
+                  ) : (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        code({ inline, className, children, ...props }) {
+                          return inline ? (
+                            <InlineCode className={className} {...props}>
+                              {children}
+                            </InlineCode>
+                          ) : (
+                            <CodeBlock className={className} {...props}>
+                              {children}
+                            </CodeBlock>
+                          )
+                        }
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  )
+                ) : (
+                  <pre>{msg.content}</pre>
+                )}
               </div>
               {msg.metadata && (
                 <div className="message-metadata">
@@ -413,13 +840,24 @@ function App() {
                   {msg.metadata.tokens && (
                     <span>Tokens: {msg.metadata.tokens}</span>
                   )}
+                  {msg.metadata.cost_usd !== undefined && (
+                    <span>Cost: ${msg.metadata.cost_usd.toFixed(4)}</span>
+                  )}
+                  {msg.metadata.documents_used !== undefined && msg.metadata.documents_used > 0 && (
+                    <span>📄 Documents: {msg.metadata.documents_used}</span>
+                  )}
                   {msg.metadata.retrieved_docs && (
                     <span>Retrieved: {msg.metadata.retrieved_docs} docs</span>
                   )}
                 </div>
               )}
+              </div>
             </div>
           ))}
+
+          {pipelineEvents.length > 0 && (
+            <PipelineProgress events={pipelineEvents} />
+          )}
 
           {loading && (
             <div className="message assistant loading">
@@ -440,17 +878,85 @@ function App() {
         </div>
 
         <div className="input-area">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            disabled={loading}
-            rows={3}
+          {currentSessionId && (
+            <DocumentList
+              documents={documents}
+              onDocumentRemoved={handleDocumentRemoved}
+              onDocumentUpdated={handleDocumentUpdated}
+              apiBaseUrl={API_BASE_URL}
+            />
+          )}
+
+          <div className="system-prompt-section">
+            <button
+              className="system-prompt-toggle"
+              onClick={() => setShowSystemPrompt(!showSystemPrompt)}
+            >
+              {showSystemPrompt ? '▼' : '▶'} System Prompt
+            </button>
+            {showSystemPrompt && (
+              <textarea
+                className="system-prompt-editor"
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="Enter system prompt to guide the assistant's behavior..."
+                rows={2}
+              />
+            )}
+          </div>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            hidden
+            onChange={handleFileSelected}
+            accept=".pdf,.txt,.md,.docx"
           />
-          <button onClick={sendMessage} disabled={loading || !input.trim()}>
-            {loading ? 'Sending...' : 'Send'}
-          </button>
+
+          <div className="input-container">
+            <div className="input-wrapper">
+              <div className="input-actions">
+                {/* Attach button */}
+                <button
+                  className="attach-button"
+                  onClick={handleAttachClick}
+                  aria-label="Attach file or URL"
+                >
+                  📎
+                </button>
+
+                {/* Popover menu */}
+                {showAttachPopover && (
+                  <AttachPopover
+                    onClose={() => setShowAttachPopover(false)}
+                    onFileSelect={handleFileSelectFromPopover}
+                    onUrlSubmit={handleUrlSubmit}
+                  />
+                )}
+              </div>
+
+              {/* Message input */}
+              <textarea
+                className="input-field"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Message..."
+                disabled={loading}
+                rows={1}
+              />
+
+              {/* Send button */}
+              <button
+                className="send-button"
+                onClick={sendMessage}
+                disabled={loading || !input.trim()}
+              >
+                ➤
+              </button>
+            </div>
+          </div>
         </div>
         </div>
         )}

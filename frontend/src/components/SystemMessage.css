@@ -1,0 +1,117 @@
+/* Modern System Message Component */
+.system-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  animation: slideIn 0.3s ease-out;
+  border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.system-message .icon {
+  font-size: 1.125rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.system-message .content {
+  flex: 1;
+  line-height: 1.5;
+  color: inherit;
+}
+
+/* URL Detection - Blue/Info */
+.system-message.url_detection {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.system-message.url_detection .icon {
+  color: #3b82f6;
+}
+
+/* Document Added - Green/Success */
+.system-message.document_added {
+  background: #d1f4e0;
+  color: #065f46;
+}
+
+.system-message.document_added .icon {
+  color: #10a37f;
+}
+
+/* Document Uploading - Orange/Warning */
+.system-message.document_uploading {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.system-message.document_uploading .icon {
+  color: #f59e0b;
+}
+
+/* Error - Red */
+.system-message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.system-message.error .icon {
+  color: #ef4444;
+}
+
+/* Info - Gray */
+.system-message.info {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.system-message.info .icon {
+  color: #6b7280;
+}
+
+/* View Document Button */
+.view-doc-btn {
+  margin-left: auto;
+  padding: 0.375rem 0.875rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  color: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.view-doc-btn:hover {
+  background: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.view-doc-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
