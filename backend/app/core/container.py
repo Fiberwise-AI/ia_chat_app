@@ -16,3 +16,5 @@ class ServiceContainer:
         self.llm_service: Optional[LLMProviderService] = None
         self.services_registry: Optional[ServiceRegistry] = None
         self.pipeline_cache: Optional[PipelineCache] = None
+        # Optional Redis client (async Redis instance from redis.asyncio)
+        self.redis_client: Optional[object] = None

@@ -97,6 +97,8 @@ class DocumentProcessor:
                 metadata=fetch_result['metadata']
             )
 
+            logger.info(f"Stored document {document_id} for session {session_id}")
+
             # Final success message
             await self.ws_manager.broadcast_pipeline_event(
                 session_id=session_id,

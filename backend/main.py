@@ -96,6 +96,16 @@ def setup_services(db_manager: DatabaseManager) -> ServiceContainer:
     services_registry.register('db_manager', db_manager)
     services.services_registry = services_registry
 
+    # Optional Redis for pub/sub notifications (cache invalidation)
+    redis_url = os.getenv('REDIS_URL')
+    if redis_url:
+        try:
+            import redis.asyncio as aioredis
+            services.redis_client = aioredis.Redis.from_url(redis_url, decode_responses=True)
+            logger.info("Connected to Redis for pub/sub notifications")
+        except Exception as e:
+            logger.warning(f"Redis not available or failed to initialize: {e}")
+
     return services
 
 
@@ -212,6 +222,15 @@ async def lifespan(app: FastAPI):
     pipeline_cache.load_all(pipelines_dir)
     services.pipeline_cache = pipeline_cache
 
+    # Start redis-based pipeline update listener (if redis available)
+    if getattr(services, 'redis_client', None):
+        try:
+            pipeline_cache.start_redis_listener(services.redis_client, db_manager)
+            app.state.pipeline_redis_listener = pipeline_cache
+            logger.info("Pipeline cache redis listener task created")
+        except Exception as e:
+            logger.warning(f"Failed to start pipeline redis listener: {e}")
+
     # Auto-import filesystem pipelines to database at startup
     await auto_import_pipelines_to_db(db_manager, pipeline_cache, pipelines_dir)
 
@@ -248,6 +267,14 @@ async def lifespan(app: FastAPI):
         if db_manager:
             db_manager.disconnect()
             logger.info("Database connection closed")
+        # Stop redis listener
+        try:
+            pipeline_task_container = getattr(app.state, 'pipeline_redis_listener', None)
+            if pipeline_task_container:
+                pipeline_task_container.stop_redis_listener()
+                logger.info("Stopped pipeline redis listener task")
+        except Exception:
+            pass
         logger.info("Shutdown complete")
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")

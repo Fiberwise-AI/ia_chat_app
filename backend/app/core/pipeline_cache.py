@@ -18,7 +18,9 @@ Usage in ia_chat_app:
 """
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import asyncio
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,9 @@ class PipelineCache:
 
     def __init__(self):
         self._pipelines: Dict[str, Dict[str, Any]] = {}
+        self._redis_listener_task: Optional[asyncio.Task] = None
+        self._redis_client: Optional[object] = None
+        self._db_manager: Optional[object] = None
 
     def load_all(self, pipelines_dir: Path) -> None:
         """
@@ -143,3 +148,81 @@ class PipelineCache:
             logger.info(f"Removed pipeline from registry: {pipeline_name}")
             return True
         return False
+
+    def start_redis_listener(self, redis_client: object, db_manager: object) -> None:
+        """
+        Start a background task that listens for `pipeline_update` messages.
+
+        Args:
+            redis_client: Async Redis client (redis.asyncio.Redis)
+            db_manager: DatabaseManager for fetching pipeline JSON
+        """
+        try:
+            if not redis_client:
+                return
+
+            self._redis_client = redis_client
+            self._db_manager = db_manager
+            # Start background listener task
+            self._redis_listener_task = asyncio.create_task(self._redis_listener())
+            logger.info("Started pipeline_update redis listener")
+        except Exception as e:
+            logger.error(f"Failed to start redis listener: {e}")
+
+    def stop_redis_listener(self) -> None:
+        """Stop the background redis listener task if running."""
+        try:
+            if self._redis_listener_task and not self._redis_listener_task.done():
+                self._redis_listener_task.cancel()
+                logger.info("Stopping pipeline_update redis listener")
+        except Exception as e:
+            logger.error(f"Failed to stop redis listener: {e}")
+
+    async def _redis_listener(self) -> None:
+        """Background coroutine that subscribes to 'pipeline_update' and refreshes cache."""
+        if not self._redis_client or not self._db_manager:
+            return
+
+        try:
+            pubsub = self._redis_client.pubsub()
+            await pubsub.subscribe('pipeline_update')
+            async for message in pubsub.listen():
+                try:
+                    # message format from redis.asyncio: dict with keys type/data
+                    if not message:
+                        continue
+                    if message.get('type') != 'message':
+                        continue
+
+                    data = message.get('data')
+                    if isinstance(data, (bytes, bytearray)):
+                        data = data.decode('utf-8')
+                    if not data:
+                        continue
+
+                    payload = json.loads(data)
+                    pipeline_name = payload.get('pipeline')
+                    if not pipeline_name:
+                        continue
+
+                    # Fetch latest JSON from DB and update cache
+                    row = self._db_manager.fetch_one(
+                        "SELECT pipeline_json FROM pipeline_definitions WHERE name = :name",
+                        {"name": pipeline_name}
+                    )
+                    if row and row.get('pipeline_json'):
+                        try:
+                            config = json.loads(row['pipeline_json'])
+                            self.add(pipeline_name, config)
+                            logger.info(f"Pipeline cache refreshed for: {pipeline_name}")
+                        except Exception as e:
+                            logger.error(f"Failed to parse pipeline JSON for {pipeline_name}: {e}")
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"Error processing pipeline update message: {e}")
+
+        except asyncio.CancelledError:
+            logger.info("Redis pipeline_update listener cancelled")
+        except Exception as e:
+            logger.error(f"Redis pipeline_update listener terminated unexpectedly: {e}")

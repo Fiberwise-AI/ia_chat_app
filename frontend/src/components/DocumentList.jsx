@@ -2,7 +2,7 @@ import { useState } from 'react'
 import './DocumentList.css'
 
 export function DocumentList({ documents, onDocumentRemoved, onDocumentUpdated, apiBaseUrl }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   if (!documents || documents.length === 0) {
     return null

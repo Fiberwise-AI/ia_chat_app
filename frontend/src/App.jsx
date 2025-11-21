@@ -1,34 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeHighlight from 'rehype-highlight'
-import 'highlight.js/styles/github-dark.css'
 import './App.modern.css'
 import { API_BASE_URL } from './config'
-import { CodeBlock, InlineCode } from './components/CodeBlock'
-import { DocumentUpload } from './components/DocumentUpload'
 import { DocumentList } from './components/DocumentList'
-import { CitationHighlighter } from './components/CitationHighlighter'
 import { DocumentLibrary } from './components/DocumentLibrary'
-import { SystemMessage } from './components/SystemMessage'
 import { PipelineProgress } from './components/PipelineProgress'
-import { AttachPopover } from './components/AttachPopover'
-
-// Helper function for better timestamp formatting
-const formatTimestamp = (timestamp) => {
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString()
-}
+import { ChatMessage } from './components/ChatMessage'
+import { ChatInput } from './components/ChatInput'
+import { SessionStats } from './components/SessionStats'
 
 function App() {
   const [messages, setMessages] = useState([])
@@ -156,20 +134,8 @@ function App() {
         }
         setMessages(prev => [...prev, systemMessage])
       } else if (data.type === 'pipeline_progress') {
-        // Add or update pipeline progress (ephemeral - for real-time display)
+        // Show pipeline progress in real-time only (ephemeral, not persisted)
         setPipelineEvents(prev => [...prev, data.data])
-
-        // Also save completed steps as system messages so they persist
-        if (data.data.status === 'completed') {
-          const progressMessage = {
-            role: 'system',
-            content: data.data.message,
-            type: 'pipeline_step',
-            metadata: data.data.metadata,
-            timestamp: new Date().toISOString()
-          }
-          setMessages(prev => [...prev, progressMessage])
-        }
       } else if (data.type === 'document_complete') {
         // Add completion message and reload documents
         const systemMessage = {
@@ -761,98 +727,10 @@ function App() {
             </div>
           )}
 
-          {messages.length > 0 && (
-            <div className="session-stats">
-              <span>Session Messages: {messages.length}</span>
-              <span>
-                Total Cost: ${messages
-                  .filter(m => m.metadata?.cost_usd)
-                  .reduce((sum, m) => sum + m.metadata.cost_usd, 0)
-                  .toFixed(4)}
-              </span>
-              <span>
-                Total Tokens: {messages
-                  .filter(m => m.metadata?.tokens)
-                  .reduce((sum, m) => sum + m.metadata.tokens, 0)
-                  .toLocaleString()}
-              </span>
-            </div>
-          )}
+          <SessionStats messages={messages} />
 
           {messages.map((msg, idx) => (
-            <div key={idx} className={`message ${msg.role} ${msg.type || ''} ${msg.error ? 'error' : ''}`}>
-              {msg.role !== 'system' && (
-                <div className="message-avatar">
-                  {msg.role === 'user' ? '👤' : '🤖'}
-                </div>
-              )}
-              <div className="message-bubble">
-                {msg.role !== 'system' && (
-                  <div className="message-header">
-                    <strong>{msg.role === 'user' ? 'You' : 'Assistant'}</strong>
-                    <span className="timestamp" title={new Date(msg.timestamp).toLocaleString()}>
-                      {formatTimestamp(msg.timestamp)}
-                    </span>
-                  </div>
-                )}
-              <div className="message-content">
-                {msg.role === 'system' ? (
-                  <SystemMessage message={msg} />
-                ) : msg.role === 'assistant' ? (
-                  msg.metadata?.chunk_mapping && msg.metadata.chunk_mapping.length > 0 ? (
-                    <CitationHighlighter
-                      content={msg.content}
-                      chunkMapping={msg.metadata.chunk_mapping}
-                    />
-                  ) : (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeHighlight]}
-                      components={{
-                        code({ inline, className, children, ...props }) {
-                          return inline ? (
-                            <InlineCode className={className} {...props}>
-                              {children}
-                            </InlineCode>
-                          ) : (
-                            <CodeBlock className={className} {...props}>
-                              {children}
-                            </CodeBlock>
-                          )
-                        }
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  )
-                ) : (
-                  <pre>{msg.content}</pre>
-                )}
-              </div>
-              {msg.metadata && (
-                <div className="message-metadata">
-                  {msg.metadata.provider && (
-                    <span>Provider: {msg.metadata.provider}</span>
-                  )}
-                  {msg.metadata.model && (
-                    <span>Model: {msg.metadata.model}</span>
-                  )}
-                  {msg.metadata.tokens && (
-                    <span>Tokens: {msg.metadata.tokens}</span>
-                  )}
-                  {msg.metadata.cost_usd !== undefined && (
-                    <span>Cost: ${msg.metadata.cost_usd.toFixed(4)}</span>
-                  )}
-                  {msg.metadata.documents_used !== undefined && msg.metadata.documents_used > 0 && (
-                    <span>📄 Documents: {msg.metadata.documents_used}</span>
-                  )}
-                  {msg.metadata.retrieved_docs && (
-                    <span>Retrieved: {msg.metadata.retrieved_docs} docs</span>
-                  )}
-                </div>
-              )}
-              </div>
-            </div>
+            <ChatMessage key={idx} message={msg} />
           ))}
 
           {pipelineEvents.length > 0 && (
@@ -905,58 +783,21 @@ function App() {
             )}
           </div>
 
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            hidden
-            onChange={handleFileSelected}
-            accept=".pdf,.txt,.md,.docx"
+          {/* Chat input with attach functionality */}
+          <ChatInput
+            input={input}
+            loading={loading}
+            showAttachPopover={showAttachPopover}
+            fileInputRef={fileInputRef}
+            onInputChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyPress}
+            onSendMessage={sendMessage}
+            onAttachClick={handleAttachClick}
+            onFileSelect={handleFileSelectFromPopover}
+            onUrlSubmit={handleUrlSubmit}
+            onClosePopover={() => setShowAttachPopover(false)}
+            onFileChange={handleFileSelected}
           />
-
-          <div className="input-container">
-            <div className="input-wrapper">
-              <div className="input-actions">
-                {/* Attach button */}
-                <button
-                  className="attach-button"
-                  onClick={handleAttachClick}
-                  aria-label="Attach file or URL"
-                >
-                  📎
-                </button>
-
-                {/* Popover menu */}
-                {showAttachPopover && (
-                  <AttachPopover
-                    onClose={() => setShowAttachPopover(false)}
-                    onFileSelect={handleFileSelectFromPopover}
-                    onUrlSubmit={handleUrlSubmit}
-                  />
-                )}
-              </div>
-
-              {/* Message input */}
-              <textarea
-                className="input-field"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Message..."
-                disabled={loading}
-                rows={1}
-              />
-
-              {/* Send button */}
-              <button
-                className="send-button"
-                onClick={sendMessage}
-                disabled={loading || !input.trim()}
-              >
-                ➤
-              </button>
-            </div>
-          </div>
         </div>
         </div>
         )}

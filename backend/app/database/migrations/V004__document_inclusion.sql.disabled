@@ -1,0 +1,27 @@
+-- Migration V004: Add document inclusion and organization features
+-- Created: 2025-11-10
+-- Description: Add fields for selective document inclusion, tags, collections, and folders
+-- Note: This migration runs once and is tracked by NexusQL
+
+-- Add columns to documents table
+ALTER TABLE documents ADD COLUMN included_in_context BOOLEAN DEFAULT TRUE;
+ALTER TABLE documents ADD COLUMN tags TEXT;
+ALTER TABLE documents ADD COLUMN collection_id VARCHAR(36);
+ALTER TABLE documents ADD COLUMN folder_path TEXT DEFAULT '/';
+
+-- Create collections table
+CREATE TABLE IF NOT EXISTS document_collections (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    color VARCHAR(7),
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Create indexes (idempotent with IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_documents_collection ON documents(collection_id);
+CREATE INDEX IF NOT EXISTS idx_documents_folder ON documents(folder_path);
+CREATE INDEX IF NOT EXISTS idx_documents_included ON documents(included_in_context);

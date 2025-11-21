@@ -88,6 +88,10 @@ class FetchDocumentsStep(Step):
             {'session_id': session_id}
         )
 
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"FetchDocumentsStep: Found {len(docs)} documents for session {session_id}")
+
         if not docs:
             return {
                 'documents': [],

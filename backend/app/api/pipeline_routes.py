@@ -1,7 +1,7 @@
 """
 API routes for pipeline management.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
@@ -12,7 +12,8 @@ import logging
 from ia_auth_sessions import get_current_active_user
 from nexusql import DatabaseManager
 
-from app.core.dependencies import get_db_manager, get_pipeline_cache
+from app.core.dependencies import get_db_manager, get_pipeline_cache, get_services
+from app.core.container import ServiceContainer
 from app.core.pipeline_cache import PipelineCache
 
 router = APIRouter(prefix="/api/pipelines", tags=["pipelines"])
@@ -352,7 +353,13 @@ async def delete_pipeline(
 async def import_from_filesystem(
     current_user: dict = Depends(get_current_active_user),
     db_manager: DatabaseManager = Depends(get_db_manager),
-    pipeline_cache: PipelineCache = Depends(get_pipeline_cache)
+    pipeline_cache: PipelineCache = Depends(get_pipeline_cache),
+    request: Request = None,
+    services_container: ServiceContainer = Depends(get_services),
+    force: bool = False,
+    dry_run: bool = False,
+    validate_only: bool = False,
+    allow_hitl_override: bool = False
 ):
     """Import pipelines from filesystem into database."""
     logger.info(f"Importing pipelines from filesystem by user: {current_user['username']}")
@@ -373,15 +380,117 @@ async def import_from_filesystem(
 
                 # Check if already exists
                 existing = db_manager.fetch_one(
-                    "SELECT id FROM pipeline_definitions WHERE name = :name",
+                    "SELECT * FROM pipeline_definitions WHERE name = :name",
                     {"name": pipeline_name}
                 )
 
+                # Validate pipeline JSON before writing
+                # Use ia_modules validator - validate pipeline structure and step imports
+                try:
+                    from ia_modules.cli.validate import validate_pipeline
+                    validation_result = validate_pipeline(pipeline_json, strict=False)
+                except Exception as e:
+                    logger.warning(f"Validation routine failed for {pipeline_name}: {e}")
+                    validation_result = None
+
+                if validation_result is not None:
+                    if not validation_result.is_valid:
+                        # If the request only asked to validate, return errors
+                        if dry_run or validate_only:
+                            skipped.append(f"{pipeline_name} (validation failed)")
+                            continue
+                        else:
+                            # Abort the whole operation and return errors for non-dry-run
+                            raise HTTPException(status_code=400, detail={"pipeline": pipeline_name, "errors": validation_result.errors, "warnings": validation_result.warnings})
+
                 if existing:
-                    skipped.append(f"{pipeline_name} (already exists)")
+                    # existing pipeline - decide behavior based on 'force'
+                    if not force:
+                        skipped.append(f"{pipeline_name} (already exists)")
+                        continue
+
+                    # Force operation allowed only for admins
+                    if not current_user.get('is_admin'):
+                        raise HTTPException(status_code=403, detail="Force import is restricted to administrators")
+
+                    # Prevent force if there are pending HITL interactions (protect live workflows)
+                    if not allow_hitl_override:
+                        try:
+                            pending = db_manager.fetch_one(
+                                "SELECT COUNT(*) as cnt FROM hitl_interactions WHERE pipeline_id = :pipeline_id AND status = 'pending'",
+                                {"pipeline_id": existing['id']}
+                            )
+                            if pending and pending.get('cnt', 0) > 0:
+                                raise HTTPException(status_code=409, detail=f"Pipeline {pipeline_name} has pending human interactions - cannot force import")
+                        except Exception:
+                            # If hitl table doesn't exist or query fails, continue silently (no HITL on system)
+                            pass
+
+                    # If only asked to validate, do not write
+                    if validate_only or dry_run:
+                        imported.append(pipeline_name)
+                        continue
+
+                    # Replace existing pipeline JSON
+                    pipeline_id = existing['id']
+                    now = datetime.now()
+
+                    # Write previous version to versions table for rollback/audit
+                    try:
+                        db_manager.execute(
+                            """
+                            INSERT INTO pipeline_versions (id, pipeline_id, pipeline_name, pipeline_json, git_commit_sha, imported_by)
+                            VALUES (:id, :pipeline_id, :pipeline_name, :pipeline_json, :git_commit_sha, :imported_by)
+                            """,
+                            {
+                                'id': str(uuid4()),
+                                'pipeline_id': pipeline_id,
+                                'pipeline_name': pipeline_name,
+                                'pipeline_json': existing.get('pipeline_json'),
+                                'git_commit_sha': request.headers.get('X-GIT-COMMIT') if request else None,
+                                'imported_by': current_user.get('id')
+                            }
+                        )
+                    except Exception:
+                        # Ignore if table not present or insert fails
+                        pass
+
+                    db_manager.execute(
+                        """
+                        UPDATE pipeline_definitions
+                        SET pipeline_json = :pipeline_json,
+                            version = :version,
+                            updated_at = :updated_at
+                        WHERE id = :id
+                        """,
+                        {
+                            "id": pipeline_id,
+                            "pipeline_json": json.dumps(pipeline_json),
+                            "version": pipeline_json.get("version", existing.get('version', '1.0.0')),
+                            "updated_at": now
+                        }
+                    )
+
+                    # Refresh cache (update in-memory registry)
+                    pipeline_cache.add(pipeline_name, pipeline_json)
+
+                    imported.append(pipeline_name)
+                    logger.info(f"Replaced pipeline: {pipeline_name}")
+                    try:
+                        redis_client = getattr(services_container, 'redis_client', None)
+                        if redis_client:
+                            commit_sha = None
+                            if request:
+                                commit_sha = request.headers.get('X-GIT-COMMIT') or request.headers.get('x-git-commit')
+                            await redis_client.publish('pipeline_update', json.dumps({
+                                'pipeline': pipeline_name,
+                                'git_commit': commit_sha
+                            }))
+                    except Exception as e:
+                        logger.debug(f"Failed to publish pipeline_update: {e}")
                     continue
 
-                # Import
+                # Import (new pipeline)
                 pipeline_id = str(uuid4())
                 now = datetime.now()
 
@@ -409,6 +518,39 @@ async def import_from_filesystem(
                 imported.append(pipeline_name)
                 logger.info(f"Imported pipeline: {pipeline_name}")
 
+                # Create initial version entry
+                try:
+                    db_manager.execute(
+                        """
+                        INSERT INTO pipeline_versions (id, pipeline_id, pipeline_name, pipeline_json, git_commit_sha, imported_by)
+                        VALUES (:id, :pipeline_id, :pipeline_name, :pipeline_json, :git_commit_sha, :imported_by)
+                        """,
+                        {
+                            'id': str(uuid4()),
+                            'pipeline_id': pipeline_id,
+                            'pipeline_name': pipeline_name,
+                            'pipeline_json': json.dumps(pipeline_json),
+                            'git_commit_sha': request.headers.get('X-GIT-COMMIT') if request else None,
+                            'imported_by': current_user.get('id')
+                        }
+                    )
+                except Exception:
+                    pass
+
+                # Publish a pipeline update event for cache invalidation if Redis client is available
+                try:
+                    redis_client = getattr(services_container, 'redis_client', None)
+                    if redis_client:
+                        commit_sha = None
+                        if request:
+                            commit_sha = request.headers.get('X-GIT-COMMIT') or request.headers.get('x-git-commit')
+                        await redis_client.publish('pipeline_update', json.dumps({
+                            'pipeline': pipeline_name,
+                            'git_commit': commit_sha
+                        }))
+                except Exception as e:
+                    logger.debug(f"Failed to publish pipeline_update: {e}")
+
             except Exception as e:
                 logger.error(f"Error importing {json_file.name}: {e}")
                 skipped.append(f"{json_file.name} (error: {str(e)})")
@@ -419,6 +561,76 @@ async def import_from_filesystem(
             "total_imported": len(imported),
             "total_skipped": len(skipped)
         }
+
+@router.post("/{pipeline_name}/revert")
+async def revert_pipeline(
+    pipeline_name: str,
+    version_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user),
+    db_manager: DatabaseManager = Depends(get_db_manager),
+    pipeline_cache: PipelineCache = Depends(get_pipeline_cache),
+    request: Request = None,
+    services_container: ServiceContainer = Depends(get_services)
+):
+    """Revert pipeline to a previous version from pipeline_versions table."""
+    if not current_user.get('is_admin'):
+        raise HTTPException(status_code=403, detail="Only admins may revert pipelines")
+
+    try:
+        if version_id:
+            version = db_manager.fetch_one(
+                "SELECT * FROM pipeline_versions WHERE id = :id",
+                {"id": version_id}
+            )
+        else:
+            # Get latest version for pipeline
+            version = db_manager.fetch_one(
+                "SELECT * FROM pipeline_versions WHERE pipeline_name = :pipeline_name ORDER BY imported_at DESC LIMIT 1",
+                {"pipeline_name": pipeline_name}
+            )
+
+        if not version:
+            raise HTTPException(status_code=404, detail="Pipeline version not found")
+
+        # Check for pending HITL interactions
+        pending = None
+        try:
+            pending = db_manager.fetch_one(
+                "SELECT COUNT(*) AS cnt FROM hitl_interactions WHERE pipeline_id = :pipeline_id AND status = 'pending'",
+                {"pipeline_id": version['pipeline_id']}
+            )
+            if pending and pending.get('cnt', 0) > 0:
+                raise HTTPException(status_code=409, detail="Cannot revert while pipeline has pending human interactions")
+        except Exception:
+            pass
+
+        # Write back to pipeline_definitions
+        db_manager.execute(
+            "UPDATE pipeline_definitions SET pipeline_json = :pipeline_json, updated_at = :updated_at WHERE name = :name",
+            {
+                'pipeline_json': version['pipeline_json'],
+                'updated_at': datetime.now(),
+                'name': pipeline_name
+            }
+        )
+
+        pipeline_cache.add(pipeline_name, json.loads(version['pipeline_json']))
+
+        # Publish cache invalidation
+        try:
+            redis_client = getattr(services_container, 'redis_client', None)
+            if redis_client:
+                await redis_client.publish('pipeline_update', json.dumps({'pipeline': pipeline_name, 'reverted_to': version['id']}))
+        except Exception:
+            pass
+
+        return {"message": f"Pipeline '{pipeline_name}' reverted to version {version['id']}"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reverting pipeline {pipeline_name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
     except Exception as e:
         logger.error(f"Error importing pipelines: {e}", exc_info=True)
